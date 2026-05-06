@@ -51,6 +51,7 @@ def create_db():
     
     cursor = conn.cursor()
     cursor.executescript(init_db)
+    
     conn.commit() 
     conn.close() 
     db_flag = True 
@@ -685,8 +686,8 @@ def search():
                 "likes": str(like_count)
             }
 
-            conn.close()
-            return jsonify({"status": 1, "data": result})
+        conn.close()
+        return jsonify({"status": 1, "data": result})
     except Exception as e:
         print("SEARCH ERROR:", e)
         return jsonify({"status": 2, "data": "NULL"})
