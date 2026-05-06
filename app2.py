@@ -1,3 +1,4 @@
+import secrets 
 import sqlite3 
 import os 
 import json
@@ -55,7 +56,6 @@ def create_db():
     conn.commit() 
     conn.close() 
     db_flag = True 
-    return conn
 
 def get_db():
     global db_flag
@@ -67,7 +67,12 @@ def get_db():
     return conn
 
 def hash_password(password, salt):
-    return hashlib.sha256((password + salt).encode("utf-8")).hexdigest()
+    return hashlib.pbkdf2_hmac(
+        "sha256", 
+        password.encode("utf-8"), 
+        salt.encode("utf-8"), 
+        100000
+    ).hex()
 
 def read_key_file():
     with open("key.txt", "r") as key_file:
@@ -126,7 +131,7 @@ def verify_jwt(jwt_token):
     key = read_key_file()
     expected_signature = make_signature(catenated_hp, key)
 
-    if given_signature != expected_signature:
+    if not hmac.compare_digest(given_signature, expected_signature): 
         return None
         
     header = b64url_decode(encoded_header)
@@ -238,9 +243,16 @@ def create_user():
     username = request.form.get('username')
     email_address = request.form.get('email_address')
     password = request.form.get('password')
-    salt = request.form.get('salt')
+    salt = secrets.token_hex(16)
     moderator = request.form.get('moderator')
 
+
+    if not username or not email_address or not password:
+        return jsonify({
+            "status": 4, 
+            "pass_hash": "NULL"
+        })3
+    
     if moderator is None: 
         moderator = "False"
     else: 
@@ -322,7 +334,7 @@ def login():
 
 @app.route('/update', methods=(['POST']))
 def update():
-    jwt_token = request.form.get('jwt')
+    jwt_token = request.headers.get('Authorization')
     payload = verify_jwt(jwt_token)
 
     if payload is None:
@@ -397,7 +409,7 @@ def update():
 
 @app.route('/view', methods=(['POST']))
 def view():
-    jwt_token = request.form.get('jwt')
+    jwt_token = request.headers.get('Authorization')
     payload = verify_jwt(jwt_token)
 
     if payload is None:
@@ -447,6 +459,9 @@ def create_post():
     post_id = request.form.get('post_id')
     tags_json = request.form.get('tags')
 
+    if not title or not body or not post_id:
+        return jsonify({"status": 2})
+
     try: 
         conn = get_db()
         cursor = conn.cursor()
@@ -490,6 +505,9 @@ def follow():
     follower_id = follower_user[0]
     following_id = target_user[0]
 
+    if following_id == follower_id: 
+        return jsonify({"status": 2})
+        
     try: 
         conn = get_db()
         cursor = conn.cursor()
